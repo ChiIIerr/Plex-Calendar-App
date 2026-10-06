@@ -15,6 +15,52 @@ A native Windows server app for the shows and movies making their way to your Pl
 
 Calendarr reads the upstream services. Add titles, edit monitoring, manage downloads, and scan libraries in their respective applications.
 
+## Screenshots
+
+These previews come from the built-in demo. Titles, release dates, download progress, and the account shown are sample data.
+
+### Calendar
+
+See upcoming episodes and movies, their current status, confirmed Plex availability, and the download pipeline in one month view.
+
+![Calendarr month calendar with upcoming releases, status badges, and download progress](docs/screenshots/calendar.jpg)
+
+<details>
+<summary>Downloads and queue</summary>
+
+Track active downloads and queued items, including progress, speed, and estimated time remaining.
+
+![Calendarr downloads view with active download progress and queued items](docs/screenshots/downloads.jpg)
+
+</details>
+
+<details>
+<summary>Monitored titles</summary>
+
+Browse the Sonarr and Radarr catalog, monitoring status, and the dates titles were added.
+
+![Calendarr monitored catalog with show and movie cards, monitoring status, and added dates](docs/screenshots/monitored.jpg)
+
+</details>
+
+<details>
+<summary>Service settings and accounts</summary>
+
+Administrators connect Sonarr, Radarr, Plex, and qBittorrent, configure refresh intervals and Plex sign-in, and manage local accounts.
+
+![Calendarr administrator settings for service integrations, sign-in options, and local accounts](docs/screenshots/settings.jpg)
+
+</details>
+
+<details>
+<summary>Sign-in</summary>
+
+Users sign in with a local account. Optional Plex sign-in can be enabled in Settings; this preview shows the local account screen.
+
+![Calendarr local account sign-in screen](docs/screenshots/sign-in.jpg)
+
+</details>
+
 ## Install on Windows
 
 Use Windows 10/11 or Windows Server 2016 or newer, with Windows PowerShell 5.1 or PowerShell 7. Install **64-bit Python 3.12 for all users**, including the Python launcher. Choose **Customize installation → Install for all users** in the [Python Windows installer](https://www.python.org/downloads/windows/). An installation under your user profile cannot be used by the boot task. Python 3.12 is the version tested by this project.
