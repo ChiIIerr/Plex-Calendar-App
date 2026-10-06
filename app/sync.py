@@ -1,7 +1,7 @@
 """Poll services independently and combine their status without guessing Plex availability."""
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from urllib.parse import quote
 
 from .integrations import safe_error
@@ -184,7 +184,9 @@ class SyncService:
                 start = (datetime.now(timezone.utc) - timedelta(days=90)).date().isoformat()
                 end = (datetime.now(timezone.utc) + timedelta(days=366)).date().isoformat()
                 catalog, calendar, queue = await asyncio.gather(self.clients.arr(config, "series"),
-                    self.clients.arr(config, "calendar", {"start": start, "end": end, "unmonitored": "true", "includeSeries": "true"}),
+                    self.clients.arr(config, "calendar", {"start": start,
+                        "end": (date.fromisoformat(end) + timedelta(days=1)).isoformat(),
+                        "unmonitored": "true", "includeSeries": "true"}),
                     self.clients.queue(config, name))
                 data = {"catalog": catalog, "calendar": calendar, "queue": queue, "coverage": [start, end]}
             elif name == "radarr":
@@ -271,7 +273,8 @@ class SyncService:
                 if time.time() - cached.get("time", 0) > 60:
                     try:
                         episodes = await self.clients.arr(self.store.settings()["sonarr"], "calendar", {
-                            "start": start, "end": end, "unmonitored": "true", "includeSeries": "true"})
+                            "start": start, "end": (date.fromisoformat(end) + timedelta(days=1)).isoformat(),
+                            "unmonitored": "true", "includeSeries": "true"})
                         cached = {"episodes": episodes, "time": time.time()}
                         self.store.set_cache(key, cached)
                         with self.store.connection() as db:

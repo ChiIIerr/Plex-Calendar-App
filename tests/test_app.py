@@ -402,3 +402,21 @@ def test_error_backoff_and_manual_retry(tmp_path):
     assert len(seen) == 1
     asyncio.run(sync.refresh(force_plex=True))
     assert len(seen) == 2
+
+
+def test_calendar_fetch_includes_entire_last_utc_day(tmp_path):
+    store = Store(tmp_path)
+    settings = store.settings()
+    settings["sonarr"] = {"enabled": True, "url": "http://sonarr", "api_key": "secret"}
+    store.save_settings(settings)
+    show = {"id": 10, "title": "Late episode", "tvdbId": 444, "monitored": True}
+    store.set_cache("sonarr", {"catalog": [show], "calendar": [], "queue": [], "coverage": ["2026-01-01", "2026-12-31"]})
+    def handler(request):
+        # The Arr API interprets date-only end parameters as midnight.
+        assert request.url.params["end"] == "2027-02-03"
+        return httpx.Response(200, json=[{"id": 100, "seriesId": 10, "monitored": True,
+            "seasonNumber": 1, "episodeNumber": 1, "airDateUtc": "2027-02-02T23:30:00Z"}])
+    sync = SyncService(store, Clients(httpx.MockTransport(handler)))
+    events = asyncio.run(sync.calendar("2027-02-01", "2027-02-02"))
+    assert len(events) == 1
+    assert events[0]["date"] == "2027-02-02T23:30:00Z"
