@@ -1,4 +1,4 @@
-"""Reelarr ASGI app. Run exactly one worker; the background poller is in-process."""
+"""Calendarr ASGI app. Run exactly one worker; the background poller is in-process."""
 import asyncio
 import contextlib
 import copy
@@ -25,7 +25,7 @@ from .sync import SyncService
 
 STATIC = Path(__file__).parent / "static"
 USERNAME = r"^[A-Za-z0-9_.@-]{3,64}$"
-COOKIE = "reelarr_session"
+COOKIE = "calendarr_session"
 
 
 class Input(BaseModel):
@@ -75,7 +75,7 @@ class Preferences(Input):
     plex_poll_seconds: int = Field(default=300, ge=60, le=3600)
     plex_login: bool = False
     plex_approval: bool = False
-    app_name: str = Field(default="Reelarr", min_length=1, max_length=48)
+    app_name: str = Field(default="Calendarr", min_length=1, max_length=48)
 
 
 class SettingsUpdate(Input):
@@ -112,7 +112,7 @@ def create_app(data_dir=None, demo=None, transport=None, background=True):
     secure_cookie = os.environ.get("SECURE_COOKIES", "").lower() in {"true", "1"} or public_url.startswith("https://")
     client_id = store.cache("client_id")
     if not client_id:
-        client_id = "reelarr-" + secrets.token_hex(16)
+        client_id = "calendarr-" + secrets.token_hex(16)
         store.set_cache("client_id", client_id)
     dummy_hash = password_hash(secrets.token_urlsafe(32))
 
@@ -125,14 +125,14 @@ def create_app(data_dir=None, demo=None, transport=None, background=True):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
 
-    app = FastAPI(title="Reelarr Calendar", version="1.0.0", lifespan=lifespan,
+    app = FastAPI(title="Calendarr Calendar", version="1.0.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store, app.state.sync, app.state.clients = store, sync, clients
 
     @app.middleware("http")
     async def request_security(request, call_next):
         if request.method not in {"GET", "HEAD", "OPTIONS"}:
-            if request.headers.get("x-reelarr-request") != "1":
+            if request.headers.get("x-calendarr-request") != "1":
                 return JSONResponse({"detail": "Missing request protection header."}, status_code=403)
             origin = request.headers.get("origin")
             allowed = {str(request.base_url).rstrip("/")}
@@ -284,13 +284,13 @@ def create_app(data_dir=None, demo=None, transport=None, background=True):
         challenge = secrets.token_urlsafe(32)
         pins[token_hash(challenge)] = {"pin_id": pin["id"], "code": pin["code"],
                                       "expires": time.time() + 600, "last_poll": 0}
-        response.set_cookie("reelarr_plex_challenge", challenge, httponly=True, secure=secure_cookie, samesite="lax", max_age=600, path="/api/auth/plex")
+        response.set_cookie("calendarr_plex_challenge", challenge, httponly=True, secure=secure_cookie, samesite="lax", max_age=600, path="/api/auth/plex")
         return {"auth_url": plex_auth_url(client_id, pin["code"])}
 
     @app.post("/api/auth/plex/poll")
     async def plex_poll(request: Request, response: Response):
         editable()
-        key = token_hash(request.cookies.get("reelarr_plex_challenge", ""))
+        key = token_hash(request.cookies.get("calendarr_plex_challenge", ""))
         pin = pins.get(key)
         if not pin or pin["expires"] < time.time():
             raise HTTPException(410, "Plex sign-in expired. Start again.")
@@ -326,7 +326,7 @@ def create_app(data_dir=None, demo=None, transport=None, background=True):
             else:
                 db.execute("UPDATE users SET plex_token=? WHERE id=?", (store.encrypt(token), row["id"]))
         pins.pop(key, None)
-        response.delete_cookie("reelarr_plex_challenge", path="/api/auth/plex")
+        response.delete_cookie("calendarr_plex_challenge", path="/api/auth/plex")
         if not row["enabled"] or not row["approved"]:
             raise HTTPException(403, "Your account is awaiting administrator approval or has been disabled.")
         return {"pending": False, "csrf": session_cookie(response, row["id"], plex=True)}

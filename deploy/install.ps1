@@ -1,10 +1,10 @@
 #Requires -Version 5.1
 [CmdletBinding()]
 param(
-    [string]$InstallDir = (Join-Path $env:ProgramFiles 'Reelarr'),
-    [string]$StateDir = (Join-Path $env:ProgramData 'Reelarr'),
+    [string]$InstallDir = (Join-Path $env:ProgramFiles 'Calendarr'),
+    [string]$StateDir = (Join-Path $env:ProgramData 'Calendarr'),
     [string]$PythonExe,
-    [ValidatePattern('^[A-Za-z0-9_.-]{1,64}$')][string]$TaskName = 'Reelarr',
+    [ValidatePattern('^[A-Za-z0-9_.-]{1,64}$')][string]$TaskName = 'Calendarr',
     [ValidateRange(1, 65535)][int]$Port = 8282,
     [string]$PublicUrl,
     [switch]$NoStart
@@ -12,6 +12,25 @@ param(
 . (Join-Path $PSScriptRoot 'common.ps1')
 Assert-Administrator
 $sourceDir = Split-Path $PSScriptRoot -Parent
+if (-not $PSBoundParameters.ContainsKey('StateDir')) { $StateDir = Resolve-StateDirectory $StateDir }
+$previousTaskName = $null
+if (Test-Path -LiteralPath (Join-Path $StateDir 'installation.json')) {
+    $existing = Get-Installation $StateDir
+    if ($existing.PSObject.Properties.Name -contains 'previous_task_name') {
+        $previousTaskName = $existing.previous_task_name
+        if ($previousTaskName -ne (Get-PreviousProductName)) { throw 'Invalid previous startup task in installation metadata.' }
+        $null = Get-CalendarrTask $previousTaskName
+    }
+    if (-not $PSBoundParameters.ContainsKey('InstallDir')) { $InstallDir = $existing.install_dir }
+    if (-not $PSBoundParameters.ContainsKey('TaskName') -and $existing.task_name -ne (Get-PreviousProductName)) { $TaskName = $existing.task_name }
+    if ($existing.task_name -ne $TaskName) {
+        $previousTask = Get-CalendarrTask $existing.task_name
+        if ($existing.task_name -ne (Get-PreviousProductName) -or ($previousTask -and $previousTask.Description -ne "$(Get-PreviousProductName) Plex Calendar managed startup.")) {
+            throw 'Use the existing TaskName for an update.'
+        }
+        $previousTaskName = $existing.task_name
+    }
+}
 $InstallDir = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
 $StateDir = [IO.Path]::GetFullPath($StateDir).TrimEnd('\')
 foreach ($target in @($InstallDir, $StateDir)) {
@@ -24,21 +43,26 @@ if ($InstallDir.StartsWith($StateDir + '\', [StringComparison]::OrdinalIgnoreCas
 }
 if (Test-Path -LiteralPath (Join-Path $StateDir 'installation.json')) {
     $existing = Get-Installation $StateDir
-    if ($existing.install_dir -ne $InstallDir -or $existing.task_name -ne $TaskName) {
+    if ($existing.install_dir -ne $InstallDir) {
         throw 'Use the existing InstallDir and TaskName for an update.'
     }
 }
-$null = Get-ReelarrTask $TaskName
+$null = Get-CalendarrTask $TaskName
 
 # Never replace files or permissions in an unrelated existing directory.
-$marker = Join-Path $InstallDir '.reelarr-installation'
+$marker = Join-Path $InstallDir '.calendarr-installation'
 if ((Test-Path -LiteralPath $InstallDir) -and (Get-ChildItem -LiteralPath $InstallDir -Force | Select-Object -First 1)) {
-    if (-not (Test-Path -LiteralPath $marker) -or (Get-Content -LiteralPath $marker -Raw).Trim() -ne 'Reelarr native Windows installation') {
-        throw 'InstallDir is not empty and is not a Reelarr installation. Choose a new dedicated directory.'
+    $validMarker = $false
+    foreach ($product in @('Calendarr', (Get-PreviousProductName))) {
+        $candidateMarker = Join-Path $InstallDir ('.' + $product.ToLowerInvariant() + '-installation')
+        if ((Test-Path -LiteralPath $candidateMarker) -and (Get-Content -LiteralPath $candidateMarker -Raw).Trim() -eq "$product native Windows installation") { $validMarker = $true }
+    }
+    if (-not $validMarker) {
+        throw 'InstallDir is not empty and is not a Calendarr installation. Choose a new dedicated directory.'
     }
 }
 if ((Test-Path -LiteralPath $StateDir) -and (Get-ChildItem -LiteralPath $StateDir -Force | Select-Object -First 1) -and -not (Test-Path -LiteralPath (Join-Path $StateDir 'installation.json'))) {
-    throw 'StateDir is not empty and has no Reelarr installation record. Choose a new dedicated directory.'
+    throw 'StateDir is not empty and has no Calendarr installation record. Choose a new dedicated directory.'
 }
 
 # Resolve a real executable; the startup task never depends on a PATH or launcher.
@@ -62,13 +86,16 @@ if ($basePrefix.StartsWith($env:USERPROFILE + '\', [StringComparison]::OrdinalIg
     throw 'This is a per-user Python installation. Install Python for all users so Local Service can run it before sign-in.'
 }
 
-Stop-ReelarrTask $TaskName
+Stop-CalendarrTask $TaskName
+if ($previousTaskName) { Stop-CalendarrTask $previousTaskName }
 Protect-Directory $InstallDir 'ReadAndExecute'
 Protect-Directory $StateDir 'Modify'
-[IO.File]::WriteAllText($marker, 'Reelarr native Windows installation')
+[IO.File]::WriteAllText($marker, 'Calendarr native Windows installation')
 # Keep enough metadata to permit retrying a partially completed installation.
 $configPath = Join-Path $StateDir 'server.json'
-Write-JsonFile (Join-Path $StateDir 'installation.json') ([ordered]@{ install_dir = $InstallDir; task_name = $TaskName; config_path = $configPath })
+$metadata = [ordered]@{ install_dir = $InstallDir; task_name = $TaskName; config_path = $configPath }
+if ($previousTaskName) { $metadata.previous_task_name = $previousTaskName }
+Write-JsonFile (Join-Path $StateDir 'installation.json') $metadata
 foreach ($folder in @('app', 'deploy')) {
     $destination = Join-Path $InstallDir $folder
     if (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Recurse -Force }
@@ -122,12 +149,16 @@ $action = New-ScheduledTaskAction -Execute $serverPython -Argument "-m app.serve
 $trigger = New-ScheduledTaskTrigger -AtStartup
 $principal = New-ScheduledTaskPrincipal -UserId 'S-1-5-19' -LogonType ServiceAccount -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-Register-ScheduledTask -TaskName $TaskName -TaskPath '\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Reelarr Plex Calendar managed startup.' -Force | Out-Null
+Register-ScheduledTask -TaskName $TaskName -TaskPath '\' -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Description 'Calendarr Plex Calendar managed startup.' -Force | Out-Null
 if (-not $NoStart) {
     Start-ScheduledTask -TaskName $TaskName -TaskPath '\'
-    Wait-Reelarr $configPath $TaskName
+    Wait-Calendarr $configPath $TaskName
 }
-Write-Host "Installed Reelarr at $InstallDir"
+if ($previousTaskName -and (Get-CalendarrTask $previousTaskName)) {
+    Unregister-ScheduledTask -TaskName $previousTaskName -TaskPath '\' -Confirm:$false
+}
+Write-JsonFile (Join-Path $StateDir 'installation.json') ([ordered]@{ install_dir = $InstallDir; task_name = $TaskName; config_path = $configPath })
+Write-Host "Installed Calendarr at $InstallDir"
 Write-Host "Startup task: $TaskName (runs before sign-in as Local Service)"
 Write-Host "Open $($config.public_url)"
 Write-Host "Configuration: $configPath"

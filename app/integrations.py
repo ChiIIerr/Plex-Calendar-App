@@ -123,7 +123,7 @@ class Clients:
     @staticmethod
     def plex_headers(client_id, token=None):
         result = {"Accept": "application/json", "X-Plex-Client-Identifier": client_id,
-                  "X-Plex-Product": "Reelarr Calendar", "X-Plex-Version": "1.0.0",
+                  "X-Plex-Product": "Calendarr Calendar", "X-Plex-Version": "1.0.0",
                   "X-Plex-Platform": "Web", "X-Plex-Device": "Browser"}
         if token:
             result["X-Plex-Token"] = token
@@ -167,4 +167,4 @@ def external_guids(item):
 
 def plex_auth_url(client_id, code):
     return "https://app.plex.tv/auth#?" + urlencode({"clientID": client_id, "code": code,
-        "context[device][product]": "Reelarr Calendar"})
+        "context[device][product]": "Calendarr Calendar"})

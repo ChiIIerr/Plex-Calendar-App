@@ -1,6 +1,6 @@
-# Reelarr · Plex Calendar
+# Calendarr · Plex Calendar
 
-A native Windows server app for the shows and movies making their way to your Plex library. Reelarr reads Sonarr, Radarr, Plex Media Server, and qBittorrent, then gives your users one place to see release dates, download progress, monitoring additions, and confirmed Plex availability.
+A native Windows server app for the shows and movies making their way to your Plex library. Calendarr reads Sonarr, Radarr, Plex Media Server, and qBittorrent, then gives your users one place to see release dates, download progress, monitoring additions, and confirmed Plex availability.
 
 ## What’s included
 
@@ -13,7 +13,7 @@ A native Windows server app for the shows and movies making their way to your Pl
 - SQLite persistence, independent background polling, and clearly marked cached status during outages.
 - A Windows installer, automatic boot startup before sign-in, failure recovery, protected storage, and rotating logs. No separate database or frontend build is needed.
 
-Reelarr reads the upstream services. Add titles, edit monitoring, manage downloads, and scan libraries in their respective applications.
+Calendarr reads the upstream services. Add titles, edit monitoring, manage downloads, and scan libraries in their respective applications.
 
 ## Install on Windows
 
@@ -32,14 +32,14 @@ Open **PowerShell as Administrator**, change into the extracted/cloned folder, t
 powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\install.ps1
 ```
 
-The installer installs dependencies, creates a dedicated Python environment, registers the **Reelarr** Task Scheduler task, and starts the app. It uses these defaults:
+The installer installs dependencies, creates a dedicated Python environment, registers the **Calendarr** Task Scheduler task, and starts the app. It uses these defaults:
 
 | Item | Location |
 | --- | --- |
-| App and Python environment | `C:\Program Files\Reelarr` |
-| Server configuration | `C:\ProgramData\Reelarr\server.json` |
-| Accounts, encrypted credentials, calendar cache/history | `C:\ProgramData\Reelarr\data` |
-| Log file | `C:\ProgramData\Reelarr\logs\server.log` |
+| App and Python environment | `C:\Program Files\Calendarr` |
+| Server configuration | `C:\ProgramData\Calendarr\server.json` |
+| Accounts, encrypted credentials, calendar cache/history | `C:\ProgramData\Calendarr\data` |
+| Log file | `C:\ProgramData\Calendarr\logs\server.log` |
 | Local address | `http://localhost:8282` |
 
 Paths use your system’s actual Program Files/ProgramData locations. App files are readable by Local Service; data/config/logs are accessible only to Local Service, Administrators, and SYSTEM. The task runs under **Local Service**, uses one server process, starts at boot without an interactive Windows login, has no runtime cutoff, and retries a failed process up to five times at one-minute intervals. Unavailable upstream services are handled inside the app and do not kill the server.
@@ -51,7 +51,7 @@ For a nondefault installation, supply `-InstallDir`, `-StateDir`, `-TaskName`, `
 Open **http://localhost:8282**. Read the first-run setup token from an elevated PowerShell window:
 
 ```powershell
-Get-Content "$env:ProgramData\Reelarr\data\setup-token"
+Get-Content "$env:ProgramData\Calendarr\data\setup-token"
 ```
 
 Enter that token on the setup page, choose a username, and create a password of at least 12 characters. The token file disappears when setup succeeds. There is no default password and no public local-account registration. If you used a custom data location, use the path printed by the installer.
@@ -67,7 +67,13 @@ URLs must be reachable **from your Windows server**. If the services are on that
 | Plex Media Server | `http://127.0.0.1:32400` | Server owner’s `X-Plex-Token` |
 | qBittorrent | `http://127.0.0.1:8080` | Web UI username/password |
 
-Use the other machine’s LAN address for services hosted elsewhere. Preserve configured URL bases, such as `http://host:8989/sonarr`. Enable the qBittorrent Web UI, and make sure its host/domain settings accept the URL you use. Reelarr maintains the required login cookie and Origin/Referer headers. It uses Web API v2 username/password login; optional API-key login is not implemented.
+Use the other machine’s LAN address for services hosted elsewhere. Preserve configured URL bases, such as `http://host:8989/sonarr`. Enable the qBittorrent Web UI, and make sure its host/domain settings accept the URL you use. Calendarr maintains the required login cookie and Origin/Referer headers. It uses Web API v2 username/password login; optional API-key login is not implemented.
+
+### Upgrading an earlier installation
+
+Rerun the installer from the updated source checkout. It detects an earlier native installation, retains its app/data locations, and renames the default startup task to **Calendarr**. Custom task names remain as configured. Run `status.ps1` to see the actual paths if they differ from the defaults above.
+
+On first start, Calendarr upgrades the previous database to `calendarr.sqlite3`, including committed journal records, and preserves accounts, encrypted credentials, history, and the original encryption key. The previous database remains as a backup. The previous default display name changes to Calendarr; custom display names are preserved. Existing users sign in again because the browser session cookie has a new name. The old product identifier appears only in the compatibility file used to detect previous installations.
 
 ### Start, stop, logs, and updates
 
@@ -79,7 +85,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 .\deploy\stop.ps1
 .\deploy\start.ps1
 .\deploy\start.ps1 -Restart
-Get-Content "$env:ProgramData\Reelarr\logs\server.log" -Tail 50 -Wait
+Get-Content "$env:ProgramData\Calendarr\logs\server.log" -Tail 50 -Wait
 ```
 
 `start.ps1 -Foreground` stops the task and runs the app in the current window for troubleshooting; Ctrl+C stops it. Run `start.ps1` afterward to return to background operation. Logs rotate at 5 MB with five retained backups. HTTP access logs are disabled.
@@ -103,7 +109,7 @@ Rerun the installer from the source checkout to register startup again. `stop.ps
 
 ## External access
 
-Use your existing **HTTPS reverse proxy** on Windows. The default listener is `127.0.0.1:8282`. Point the proxy at that address and edit `C:\ProgramData\Reelarr\server.json` as Administrator:
+Use your existing **HTTPS reverse proxy** on Windows. The default listener is `127.0.0.1:8282`. Point the proxy at that address and edit `C:\ProgramData\Calendarr\server.json` as Administrator:
 
 ```json
 {
@@ -111,8 +117,8 @@ Use your existing **HTTPS reverse proxy** on Windows. The default listener is `1
   "port": 8282,
   "public_url": "https://calendar.your-domain.example",
   "trusted_proxies": "127.0.0.1,::1",
-  "data_dir": "C:\\ProgramData\\Reelarr\\data",
-  "log_dir": "C:\\ProgramData\\Reelarr\\logs"
+  "data_dir": "C:\\ProgramData\\Calendarr\\data",
+  "log_dir": "C:\\ProgramData\\Calendarr\\logs"
 }
 ```
 
@@ -129,11 +135,11 @@ The server config is validated before startup. Relative data/log paths resolve a
 1. Connect Plex using your server owner’s token, save settings, and complete a successful sync.
 2. Enable **Allow sign-in with Plex** in Settings. Optionally enable **Require admin approval**.
 3. Users choose **Continue with Plex** on the login screen and approve the sign-in on Plex’s website.
-4. Reelarr checks that Plex lists the configured server among that user’s accessible resources. A different Plex account without server access cannot enter.
+4. Calendarr checks that Plex lists the configured server among that user’s accessible resources. A different Plex account without server access cannot enter.
 
 Plex accounts are always viewers; local accounts provide administrator access. Server access is rechecked every five minutes during an active Plex session. Plex sessions last one hour and local sessions last seven days. Disabling an account or changing its permissions revokes its sessions. An approval requirement applies to **new** Plex accounts; existing approvals remain in place. Administrators can disable or approve accounts from Settings.
 
-**Calendar scope:** every approved viewer can see the entire monitored catalog configured in this app. Reelarr does not apply Plex’s per-library sharing restrictions, parental controls, or title restrictions to calendar visibility. The **Open in Plex** link still uses the viewer’s normal Plex permissions for playback. Require local accounts or individual approval if that broader calendar visibility is not appropriate for your users.
+**Calendar scope:** every approved viewer can see the entire monitored catalog configured in this app. Calendarr does not apply Plex’s per-library sharing restrictions, parental controls, or title restrictions to calendar visibility. The **Open in Plex** link still uses the viewer’s normal Plex permissions for playback. Require local accounts or individual approval if that broader calendar visibility is not appropriate for your users.
 
 ## How statuses work
 
@@ -154,7 +160,7 @@ Plex matching uses TMDB/IMDb IDs for movies and TVDB ID plus season/episode numb
 
 qBittorrent torrents are shown only through matching Sonarr/Radarr queue entries, using download info hashes. Unrelated torrents are not exposed to viewers. Sonarr/Radarr queue progress remains available if qBittorrent is not configured. Once an imported download disappears from the Arr queue, its presence is determined through Arr file status and Plex confirmation.
 
-On the first sync, catalog additions use the original `added` timestamp when the source provides it. Monitoring toggles and removals are recorded when Reelarr observes them; it cannot reconstruct monitoring changes made before it was installed or changes toggled back between polls. The activity log retains the latest 5,000 entries; the Activity page shows the most recent 200. Availability activity is recorded when an observed item transitions into Plex. Existing Plex media does not create a flood of arrival events on initial setup.
+On the first sync, catalog additions use the original `added` timestamp when the source provides it. Monitoring toggles and removals are recorded when Calendarr observes them; it cannot reconstruct monitoring changes made before it was installed or changes toggled back between polls. The activity log retains the latest 5,000 entries; the Activity page shows the most recent 200. Availability activity is recorded when an observed item transitions into Plex. Existing Plex media does not create a flood of arrival events on initial setup.
 
 ## Recover an administrator password
 
@@ -169,7 +175,7 @@ The script uses the installed data location, stops the running task, prompts for
 
 ## Backup and restore
 
-Stop the task and back up the **entire data directory**, including `reelarr.sqlite3`, any journal files, and **encryption.key**. Also keep `server.json` and a record of custom installation paths. The database and key must stay together; losing the key makes integration credentials unreadable. Start the app again after copying.
+Stop the task and back up the **entire data directory**, including `calendarr.sqlite3`, any journal files, and **encryption.key**. Also keep `server.json` and a record of custom installation paths. The database and key must stay together; losing the key makes integration credentials unreadable. Start the app again after copying.
 
 To restore on another Windows server, install without starting (`-NoStart`), copy the backed-up data into the installed data directory, then rerun the installer. It reapplies Windows permissions and starts the app using the restored accounts/settings. Update paths in server.json if necessary. The application, data, and Python installation must be on local disks accessible before sign-in; mapped drives are not suitable for boot startup. Do not commit data, setup tokens, or keys to source control.
 
@@ -206,4 +212,4 @@ Dependencies are pinned in `requirements.lock`. The UI uses local fonts and no t
 
 The adapters use the [Sonarr v3 API](https://sonarr.tv/docs/api/), [Radarr v3 API](https://radarr.video/docs/api/), and [qBittorrent Web API v2](https://github.com/qbittorrent/qBittorrent/wiki/WebUI-API-%28qBittorrent-5.0%29). Plex library/PIN behavior follows the endpoints documented by the maintained [Python PlexAPI project](https://python-plexapi.readthedocs.io/en/latest/modules/myplex.html).
 
-Reelarr is an independent project and is not affiliated with Plex, Sonarr, Radarr, or qBittorrent.
+Calendarr is an independent project and is not affiliated with Plex, Sonarr, Radarr, or qBittorrent.

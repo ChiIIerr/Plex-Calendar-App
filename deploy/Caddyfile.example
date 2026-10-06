@@ -1,5 +1,5 @@
 # Replace calendar.example.com with your actual hostname.
-# Run Caddy on the same Windows server as Reelarr.
+# Run Caddy on the same Windows server as Calendarr.
 calendar.example.com {
     encode zstd gzip
     reverse_proxy 127.0.0.1:8282

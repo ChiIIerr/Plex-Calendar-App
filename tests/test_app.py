@@ -13,7 +13,7 @@ from app.security import password_hash, password_valid
 from app.store import DEFAULT_SETTINGS, Store
 from app.sync import SyncService, decorate, download_state, release_date
 
-HEADERS = {"X-Reelarr-Request": "1"}
+HEADERS = {"X-Calendarr-Request": "1"}
 PASSWORD = "a-strong-test-password-42"
 
 

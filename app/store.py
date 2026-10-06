@@ -9,6 +9,8 @@ from pathlib import Path
 
 from cryptography.fernet import Fernet
 
+from .migrations import PREVIOUS_NAME, migrate_database
+
 
 DEFAULT_SETTINGS = {
     "sonarr": {"url": "", "api_key": "", "enabled": False},
@@ -16,7 +18,7 @@ DEFAULT_SETTINGS = {
     "plex": {"url": "", "token": "", "enabled": False},
     "qbittorrent": {"url": "", "username": "", "password": "", "enabled": False},
     "preferences": {"poll_seconds": 60, "plex_poll_seconds": 300, "plex_login": False,
-                    "plex_approval": False, "app_name": "Reelarr"},
+                    "plex_approval": False, "app_name": "Calendarr"},
 }
 
 
@@ -24,7 +26,8 @@ class Store:
     def __init__(self, directory: Path):
         directory.mkdir(parents=True, exist_ok=True)
         self.directory = directory
-        self.path = directory / "reelarr.sqlite3"
+        self.path = directory / "calendarr.sqlite3"
+        migrate_database(directory, self.path)
         key_path = directory / "encryption.key"
         if not key_path.exists():
             self.private_file(key_path, Fernet.generate_key())
@@ -54,6 +57,11 @@ class Store:
         os.chmod(self.path, 0o600)
         if not self.get_setting_record():
             self.save_settings(DEFAULT_SETTINGS)
+        else:
+            settings = self.settings()
+            if settings.get("preferences", {}).get("app_name") == PREVIOUS_NAME:
+                settings["preferences"]["app_name"] = "Calendarr"
+                self.save_settings(settings)
         setup = directory / "setup-token"
         if not self.has_admin() and not setup.exists():
             self.private_file(setup, secrets.token_urlsafe(32).encode())

@@ -9,7 +9,7 @@ from .store import Store
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Recover a local Reelarr administrator account")
+    parser = argparse.ArgumentParser(description="Recover a local Calendarr administrator account")
     parser.add_argument("command", choices=["reset-admin"])
     parser.add_argument("username")
     parser.add_argument("--config", type=Path, help="Use the installed server's data directory")

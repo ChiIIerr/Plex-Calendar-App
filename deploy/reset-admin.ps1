@@ -1,12 +1,12 @@
 #Requires -Version 5.1
 [CmdletBinding()]
-param([Parameter(Mandatory = $true)][string]$Username, [string]$StateDir = (Join-Path $env:ProgramData 'Reelarr'))
+param([Parameter(Mandatory = $true)][string]$Username, [string]$StateDir = (Join-Path $env:ProgramData 'Calendarr'))
 . (Join-Path $PSScriptRoot 'common.ps1')
 Assert-Administrator
 $installed = Get-Installation $StateDir
-$task = Get-ReelarrTask $installed.task_name
+$task = Get-CalendarrTask $installed.task_name
 $wasRunning = $task -and $task.State -eq 'Running'
-Stop-ReelarrTask $installed.task_name
+Stop-CalendarrTask $installed.task_name
 Push-Location $installed.install_dir
 try {
     & (Join-Path $installed.install_dir '.venv\Scripts\python.exe') -m app.manage reset-admin $Username --config $installed.config_path

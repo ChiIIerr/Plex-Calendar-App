@@ -22,7 +22,7 @@ def main():
     args = parser.parse_args()
     if args.windows_state and (os.name != "nt" or os.environ.get("CI") != "true"):
         parser.error("Scheduled-task smoke checks require an isolated Windows CI installation.")
-    with tempfile.TemporaryDirectory(prefix="reelarr-native-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="calendarr-native-") as temporary:
         process = None
         output = None
         if args.windows_state:
@@ -60,7 +60,7 @@ def main():
         browser = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
         def request(path, payload=None, csrf=None, method=None):
-            headers = {"X-Reelarr-Request": "1", "Content-Type": "application/json"}
+            headers = {"X-Calendarr-Request": "1", "Content-Type": "application/json"}
             if csrf:
                 headers["X-CSRF-Token"] = csrf
             data = json.dumps(payload).encode() if payload is not None else None

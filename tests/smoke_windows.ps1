@@ -3,9 +3,9 @@
 $ErrorActionPreference = 'Stop'
 if ($env:CI -ne 'true') { throw 'This check requires disposable CI state.' }
 $root = Split-Path $PSScriptRoot -Parent
-$installDir = Join-Path $env:ProgramFiles ('Reelarr CI App ' + [char]0xE9)
-$stateDir = Join-Path $env:ProgramData ('Reelarr CI State ' + [char]0xFC)
-$taskName = 'Reelarr-CI'
+$installDir = Join-Path $env:ProgramFiles ('Calendarr CI App ' + [char]0xE9)
+$stateDir = Join-Path $env:ProgramData ('Calendarr CI State ' + [char]0xFC)
+$taskName = 'Calendarr-CI'
 $pythonExe = (Get-Command python.exe).Source
 
 # Parse every script with the actual Windows PowerShell 5.1 parser.
@@ -39,7 +39,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Installed application smoke check failed.' }
     & (Join-Path $root 'deploy\remove-startup.ps1') -StateDir $stateDir
     if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) { throw 'Startup removal failed.' }
-    if (-not (Test-Path (Join-Path $stateDir 'data\reelarr.sqlite3'))) { throw 'Startup removal deleted data.' }
+    if (-not (Test-Path (Join-Path $stateDir 'data\calendarr.sqlite3'))) { throw 'Startup removal deleted data.' }
     Write-Host 'Windows installation, task configuration, ACL, update, and startup removal checks passed.'
 } finally {
     if (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue) {

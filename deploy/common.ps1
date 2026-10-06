@@ -2,6 +2,19 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-PreviousProductName {
+    $compatibility = Join-Path (Split-Path $PSScriptRoot -Parent) 'app\legacy.json'
+    return (Get-Content -LiteralPath $compatibility -Raw -Encoding UTF8 | ConvertFrom-Json).previous_name
+}
+
+function Resolve-StateDirectory([string]$StateDir) {
+    if ($StateDir -eq (Join-Path $env:ProgramData 'Calendarr') -and -not (Test-Path -LiteralPath (Join-Path $StateDir 'installation.json'))) {
+        $previous = Join-Path $env:ProgramData (Get-PreviousProductName)
+        if (Test-Path -LiteralPath (Join-Path $previous 'installation.json')) { return $previous }
+    }
+    return $StateDir
+}
+
 function Assert-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($identity)
@@ -11,27 +24,29 @@ function Assert-Administrator {
 }
 
 function Get-Installation([string]$StateDir) {
+    $StateDir = Resolve-StateDirectory $StateDir
     $metadata = Join-Path $StateDir 'installation.json'
     if (-not (Test-Path -LiteralPath $metadata)) {
-        throw "Reelarr is not installed at $StateDir. Run deploy\install.ps1 first."
+        throw "Calendarr is not installed at $StateDir. Run deploy\install.ps1 first."
     }
     return Get-Content -LiteralPath $metadata -Raw -Encoding UTF8 | ConvertFrom-Json
 }
 
-function Get-ReelarrTask([string]$TaskName) {
+function Get-CalendarrTask([string]$TaskName) {
     $task = Get-ScheduledTask -TaskName $TaskName -TaskPath '\' -ErrorAction SilentlyContinue
-    if ($task -and $task.Description -ne 'Reelarr Plex Calendar managed startup.') {
+    $descriptions = @('Calendarr Plex Calendar managed startup.', "$(Get-PreviousProductName) Plex Calendar managed startup.")
+    if ($task -and $task.Description -notin $descriptions) {
         throw "The task '$TaskName' belongs to another application. Choose another TaskName."
     }
     return $task
 }
 
-function Stop-ReelarrTask([string]$TaskName) {
-    $task = Get-ReelarrTask $TaskName
+function Stop-CalendarrTask([string]$TaskName) {
+    $task = Get-CalendarrTask $TaskName
     if ($task -and $task.State -eq 'Running') {
         Stop-ScheduledTask -TaskName $TaskName -TaskPath '\'
         $deadline = (Get-Date).AddSeconds(20)
-        while ((Get-ReelarrTask $TaskName).State -eq 'Running') {
+        while ((Get-CalendarrTask $TaskName).State -eq 'Running') {
             if ((Get-Date) -gt $deadline) { throw "Timed out stopping task '$TaskName'." }
             Start-Sleep -Milliseconds 200
         }
@@ -60,7 +75,7 @@ function Protect-Directory([string]$Path, [string]$ServiceRights) {
     }
 }
 
-function Wait-Reelarr([string]$ConfigPath, [string]$TaskName) {
+function Wait-Calendarr([string]$ConfigPath, [string]$TaskName) {
     $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $hostAddress = $config.bind_host
     if ($hostAddress -eq '0.0.0.0') { $hostAddress = '127.0.0.1' }
@@ -68,7 +83,7 @@ function Wait-Reelarr([string]$ConfigPath, [string]$TaskName) {
     if ($hostAddress.Contains(':')) { $hostAddress = "[$hostAddress]" }
     $address = "http://${hostAddress}:$($config.port)/healthz"
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        $task = Get-ReelarrTask $TaskName
+        $task = Get-CalendarrTask $TaskName
         if ($task -and $task.State -eq 'Running') {
             try {
                 $response = Invoke-RestMethod -Uri $address -TimeoutSec 2
@@ -77,5 +92,5 @@ function Wait-Reelarr([string]$ConfigPath, [string]$TaskName) {
         }
         Start-Sleep -Seconds 1
     }
-    throw "Reelarr did not become ready. Check $($config.log_dir)\server.log and Task Scheduler's Last Run Result. For startup, Python must be installed for all users."
+    throw "Calendarr did not become ready. Check $($config.log_dir)\server.log and Task Scheduler's Last Run Result. For startup, Python must be installed for all users."
 }

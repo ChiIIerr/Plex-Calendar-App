@@ -76,9 +76,9 @@ def test_logs_are_written_and_rotated(tmp_path):
     logging.config.dictConfig({
         "version": 1, "disable_existing_loggers": False,
         "formatters": config["formatters"], "handlers": {"testfile": file_config},
-        "loggers": {"reelarr-test": {"handlers": ["testfile"], "level": "INFO", "propagate": False}},
+        "loggers": {"calendarr-test": {"handlers": ["testfile"], "level": "INFO", "propagate": False}},
     })
-    logger = logging.getLogger("reelarr-test")
+    logger = logging.getLogger("calendarr-test")
     try:
         for index in range(8):
             logger.info("Server startup record %s with enough text to force rotation", index)

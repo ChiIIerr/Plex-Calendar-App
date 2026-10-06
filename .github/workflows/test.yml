@@ -30,3 +30,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: .\tests\smoke_windows.ps1
+      - name: Verify upgrade from the previous project name
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\tests\smoke_upgrade.ps1

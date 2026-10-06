@@ -108,7 +108,7 @@ def log_config(directory):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the native Reelarr server")
+    parser = argparse.ArgumentParser(description="Run the native Calendarr server")
     parser.add_argument("--config", required=True, type=Path)
     parser.add_argument("--check", action="store_true", help="Validate configuration without starting or modifying data")
     args = parser.parse_args()
