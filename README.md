@@ -63,7 +63,7 @@ Users sign in with a local account. Optional Plex sign-in can be enabled in Sett
 
 ## Install on Windows
 
-Use Windows 10/11 or Windows Server 2016 or newer, with Windows PowerShell 5.1 or PowerShell 7. Install **64-bit Python 3.14 for all users**, including the Python launcher. Choose **Customize installation → Install for all users** in the [Python Windows installer](https://www.python.org/downloads/windows/). An installation under your user profile cannot be used by the boot task. Python 3.12, 3.13, and 3.14 are supported; the installer prefers 3.14, then 3.13, then 3.12 when using the launcher. Use the standard CPython build.
+Use Windows 10/11 or Windows Server 2016 or newer, with Windows PowerShell 5.1 or PowerShell 7. Install **64-bit Python 3.14 for all users**, including the Python launcher. Choose **Customize installation → Install for all users** in the [Python Windows installer](https://www.python.org/downloads/windows/). An installation under your user profile cannot be used by the boot task. Python 3.12, 3.13, and 3.14 are supported; the installer prefers 3.14, then 3.13, then 3.12. For each version it checks machine-wide registrations before the launcher, skips per-user or 32-bit runtimes, and finally checks `python.exe` on PATH. Use the standard CPython build.
 
 Download and extract the repository’s ZIP, or clone it with Git:
 
@@ -91,6 +91,14 @@ The installer installs dependencies, creates a dedicated Python environment, reg
 Paths use your system’s actual Program Files/ProgramData locations. App files are readable by Local Service; data/config/logs are accessible only to Local Service, Administrators, and SYSTEM. The task runs under **Local Service**, uses one server process, starts at boot without an interactive Windows login, has no runtime cutoff, and retries a failed process up to five times at one-minute intervals. Unavailable upstream services are handled inside the app and do not kill the server.
 
 For a nondefault installation, supply `-InstallDir`, `-StateDir`, `-TaskName`, `-PythonExe`, `-Port`, or `-PublicUrl`. Use an all-users Python executable with `-PythonExe`. Keep InstallDir and StateDir separate and outside the source checkout. Use the same custom paths/task name on updates, and pass `-StateDir` to the management scripts. `-NoStart` registers startup without immediately launching the server.
+
+If an older installer reports **This is a per-user Python installation** even though you installed Python for all users, the launcher may still be selecting your personal copy. Pass the actual system Python path directly, for example:
+
+```powershell
+.\deploy\install.ps1 -PythonExe 'C:\Python314\python.exe'
+```
+
+Replace that example path with your system installation's `python.exe`. You can keep both installations; the boot task uses the system runtime.
 
 ### Create the administrator and connect services
 

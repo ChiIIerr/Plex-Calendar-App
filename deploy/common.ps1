@@ -2,25 +2,63 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-MachinePythonExecutables([string]$Version) {
+    foreach ($root in @('HKLM:\SOFTWARE\Python\PythonCore', 'HKLM:\SOFTWARE\WOW6432Node\Python\PythonCore')) {
+        $install = Get-ItemProperty -LiteralPath (Join-Path $root "$Version\InstallPath") -ErrorAction SilentlyContinue
+        if ($install) {
+            $executable = $install.PSObject.Properties['ExecutablePath']
+            $directory = $install.PSObject.Properties['(default)']
+            if ($executable -and $executable.Value) { [string]$executable.Value }
+            elseif ($directory -and $directory.Value) { Join-Path $directory.Value 'python.exe' }
+        }
+    }
+}
+
+function Test-ServicePythonExecutable([string]$PythonExe) {
+    try {
+        $details = & $PythonExe -c 'import json,struct,sys; print(json.dumps([sys.base_prefix, sys.version_info.major, sys.version_info.minor, struct.calcsize(''P'')*8]))' 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $details) { return $false }
+        $info = ConvertFrom-Json -InputObject ([string]$details)
+        if ($info.Count -ne 4 -or $info[1] -lt 3 -or ($info[1] -eq 3 -and $info[2] -lt 12) -or $info[3] -ne 64) { return $false }
+        $basePrefix = [IO.Path]::GetFullPath([string]$info[0]).TrimEnd('\')
+        # A different user's profile is also unavailable to the boot service.
+        foreach ($profileRoot in @($env:USERPROFILE, (Split-Path $env:USERPROFILE -Parent))) {
+            if ($basePrefix -eq $profileRoot -or $basePrefix.StartsWith($profileRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { return $false }
+        }
+        return $true
+    } catch { return $false }
+}
+
 function Resolve-PythonExecutable([string]$PythonExe) {
     if ($PythonExe) {
         $resolved = & $PythonExe -c 'import sys; print(sys.executable)'
-        if ($LASTEXITCODE -eq 0 -and $resolved) { return [string]$resolved }
+        if ($LASTEXITCODE -eq 0 -and $resolved) {
+            if (Test-ServicePythonExecutable ([string]$resolved)) { return [string]$resolved }
+            throw 'The selected Python cannot be used by Local Service. Pass -PythonExe with a 64-bit Python 3.12 or newer installation outside user profiles.'
+        }
     } else {
-        if (Get-Command py.exe -ErrorAction SilentlyContinue) {
-            foreach ($version in @('3.14', '3.13', '3.12')) {
+        $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
+        foreach ($version in @('3.14', '3.13', '3.12')) {
+            # The launcher may hide a machine install behind a per-user install.
+            foreach ($candidate in (Get-MachinePythonExecutables $version)) {
+                try {
+                    $resolved = & $candidate -c 'import sys; print(sys.executable)' 2>$null
+                    if ($LASTEXITCODE -eq 0 -and $resolved -and (Test-ServicePythonExecutable ([string]$resolved))) { return [string]$resolved }
+                } catch { }
+            }
+            if ($launcher) {
                 try {
                     $resolved = & py.exe "-$version" -c 'import sys; print(sys.executable)' 2>$null
-                    if ($LASTEXITCODE -eq 0 -and $resolved) { return [string]$resolved }
+                    if ($LASTEXITCODE -eq 0 -and $resolved -and (Test-ServicePythonExecutable ([string]$resolved))) { return [string]$resolved }
                 } catch { }
             }
         }
         if (Get-Command python.exe -ErrorAction SilentlyContinue) {
             $resolved = & python.exe -c 'import sys; print(sys.executable)'
-            if ($LASTEXITCODE -eq 0 -and $resolved) { return [string]$resolved }
+            if ($LASTEXITCODE -eq 0 -and $resolved -and (Test-ServicePythonExecutable ([string]$resolved))) { return [string]$resolved }
         }
     }
-    throw 'Python was not found. Install 64-bit Python 3.14 for all users or pass -PythonExe with its full path. Python 3.12 and 3.13 are also supported.'
+    throw 'Python was not found for Local Service. Install 64-bit Python 3.14 for all users or pass -PythonExe with its full path. Per-user installations cannot be used for boot startup; Python 3.12 and 3.13 are also supported.'
 }
 
 function Initialize-PythonEnvironment([string]$PythonExe, [string]$InstallDir) {
