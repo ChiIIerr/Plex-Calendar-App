@@ -36,7 +36,7 @@ jobs:
       - name: Verify Windows Python discovery
         if: runner.os == 'Windows'
         shell: powershell
-        run: .\tests\test_python.ps1
+        run: .\tests\test_python.ps1 -PythonExe (Get-Command python.exe).Source
       - name: Verify Windows installer and boot startup
         if: runner.os == 'Windows'
         shell: powershell

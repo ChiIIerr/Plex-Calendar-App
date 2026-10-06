@@ -27,7 +27,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Could not install the Python 3.12 upgrade fixture dependencies.' }
     }
     & (Join-Path $root 'deploy\install.ps1') -InstallDir $installDir -StateDir $stateDir -TaskName $taskName -PythonExe $pythonExe -Port 18282
-    $versionCode = 'import sys; print(".".join(map(str, sys.version_info[:2])))'
+    $versionCode = 'import sys; print(sys.version_info[:2])'
     $expectedVersion = & $pythonExe -c $versionCode
     if ($LASTEXITCODE -ne 0) { throw 'Could not read the selected Python version.' }
     $installedVersion = & (Join-Path $installDir '.venv\Scripts\python.exe') -c $versionCode

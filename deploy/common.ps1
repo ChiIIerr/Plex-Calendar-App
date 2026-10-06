@@ -29,7 +29,7 @@ function Initialize-PythonEnvironment([string]$PythonExe, [string]$InstallDir) {
     # --clear may delete only the dedicated environment beneath this installation.
     if ($environmentDir -ne ($installRoot + '\.venv')) { throw 'Invalid Python environment path.' }
     $serverPython = Join-Path $environmentDir 'Scripts\python.exe'
-    $versionCode = 'import sys; print(".".join(map(str, sys.version_info[:2])))'
+    $versionCode = 'import sys; print(sys.version_info[:2])'
     $selectedVersion = & $PythonExe -c $versionCode
     if ($LASTEXITCODE -ne 0 -or -not $selectedVersion) { throw 'Could not determine the selected Python version.' }
     $installedVersion = $null

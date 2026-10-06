@@ -1,5 +1,6 @@
 #Requires -Version 5.1
 # Test interpreter discovery without installing Python or changing system state.
+param([string]$PythonExe, [string]$PreviousPythonExe)
 . (Join-Path (Split-Path $PSScriptRoot -Parent) 'deploy\common.ps1')
 
 function Get-Command {
@@ -52,3 +53,31 @@ $missingRejected = $false
 try { Resolve-PythonExecutable '' } catch { $missingRejected = $_.Exception.Message -like '*Python was not found*' }
 if (-not $missingRejected) { throw 'Missing Python was not rejected.' }
 Write-Host 'Python 3.14 preference, older-version fallback, PATH fallback, and explicit selection checks passed.'
+
+if ($PythonExe) {
+    $temporaryRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+    $testRoot = [IO.Path]::GetFullPath((Join-Path $temporaryRoot ('Calendarr Python Check ' + [char]0xE9 + ' ' + [Guid]::NewGuid().ToString('N'))))
+    if (-not $testRoot.StartsWith($temporaryRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid test directory.' }
+    try {
+        if ($PreviousPythonExe) {
+            & $PreviousPythonExe -m venv (Join-Path $testRoot '.venv')
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the previous Python environment.' }
+            [IO.File]::WriteAllText((Join-Path $testRoot '.venv\old-runtime.txt'), 'old')
+        }
+        $serverPython = Initialize-PythonEnvironment $PythonExe $testRoot
+        $expected = & $PythonExe -c 'import sys; print(sys.version_info[:2])'
+        if ($LASTEXITCODE -ne 0) { throw 'Could not read the selected Python version.' }
+        $actual = & $serverPython -c 'import sys; print(sys.version_info[:2])'
+        if ($LASTEXITCODE -ne 0 -or $actual -ne $expected) { throw 'Environment uses the wrong Python version.' }
+        if ($PreviousPythonExe -and (Test-Path -LiteralPath (Join-Path $testRoot '.venv\old-runtime.txt'))) { throw 'Environment retained the old runtime files.' }
+        [IO.File]::WriteAllText((Join-Path $testRoot '.venv\same-runtime.txt'), 'retained')
+        [IO.File]::WriteAllText((Join-Path $testRoot 'retained-state.txt'), 'retained')
+        $null = Initialize-PythonEnvironment $PythonExe $testRoot
+        foreach ($file in @('.venv\same-runtime.txt', 'retained-state.txt')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $testRoot $file))) { throw 'Same-version rerun removed environment or state files.' }
+        }
+        Write-Host 'Real Python environment creation, runtime selection, and same-version reuse checks passed.'
+    } finally {
+        if (Test-Path -LiteralPath $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
+    }
+}
