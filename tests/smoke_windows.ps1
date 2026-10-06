@@ -18,7 +18,13 @@ Get-ChildItem (Join-Path $root 'deploy') -Filter '*.ps1' | ForEach-Object {
 try {
     & (Join-Path $root 'deploy\install.ps1') -InstallDir $installDir -StateDir $stateDir -TaskName $taskName -PythonExe $pythonExe -Port 18282
     $task = Get-ScheduledTask -TaskName $taskName
-    if ($task.Principal.UserId -notin @('S-1-5-19', 'NT AUTHORITY\LOCAL SERVICE', 'LOCALSERVICE')) { throw 'Wrong task account.' }
+    $account = $task.Principal.UserId
+    if ($account.StartsWith('S-1-')) {
+        $accountSid = $account
+    } else {
+        $accountSid = (New-Object Security.Principal.NTAccount($account)).Translate([Security.Principal.SecurityIdentifier]).Value
+    }
+    if ($accountSid -ne 'S-1-5-19') { throw "Wrong task account: $account ($accountSid)." }
     if ($task.Settings.ExecutionTimeLimit -ne 'PT0S') { throw 'Startup task has a runtime limit.' }
     if ($task.Triggers.CimClass.CimClassName -notcontains 'MSFT_TaskBootTrigger') { throw 'Missing boot trigger.' }
     if ($task.Settings.RestartCount -ne 5) { throw 'Missing failure recovery.' }

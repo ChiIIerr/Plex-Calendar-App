@@ -2,9 +2,7 @@
 import argparse
 import ipaddress
 import json
-import logging
 import os
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -30,7 +28,11 @@ def load_config(path):
     config = DEFAULTS | raw
     if type(config["port"]) is not int or not 1 <= config["port"] <= 65535:
         raise ValueError("port must be an integer between 1 and 65535.")
+    if "public_url" not in raw:
+        config["public_url"] = f"http://localhost:{config['port']}"
     try:
+        if not isinstance(config["bind_host"], str):
+            raise ValueError
         ipaddress.ip_address(config["bind_host"])
     except (ValueError, TypeError):
         raise ValueError("bind_host must be a local IP address, such as 127.0.0.1 or 0.0.0.0.") from None
@@ -53,7 +55,8 @@ def load_config(path):
         raise ValueError("trusted_proxies must be a comma-separated list of proxy IPs or networks.")
     try:
         for entry in proxies.split(",") if proxies else []:
-            ipaddress.ip_network(entry.strip(), strict=False)
+            if ipaddress.ip_network(entry.strip(), strict=False).prefixlen == 0:
+                raise ValueError
     except ValueError:
         raise ValueError("trusted_proxies must contain specific IPs/networks; a wildcard is not allowed.") from None
     config["trusted_proxies"] = ",".join(entry.strip() for entry in proxies.split(",") if entry.strip())

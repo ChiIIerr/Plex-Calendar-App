@@ -30,6 +30,17 @@ if (Test-Path -LiteralPath (Join-Path $StateDir 'installation.json')) {
 }
 $null = Get-ReelarrTask $TaskName
 
+# Never replace files or permissions in an unrelated existing directory.
+$marker = Join-Path $InstallDir '.reelarr-installation'
+if ((Test-Path -LiteralPath $InstallDir) -and (Get-ChildItem -LiteralPath $InstallDir -Force | Select-Object -First 1)) {
+    if (-not (Test-Path -LiteralPath $marker) -or (Get-Content -LiteralPath $marker -Raw).Trim() -ne 'Reelarr native Windows installation') {
+        throw 'InstallDir is not empty and is not a Reelarr installation. Choose a new dedicated directory.'
+    }
+}
+if ((Test-Path -LiteralPath $StateDir) -and (Get-ChildItem -LiteralPath $StateDir -Force | Select-Object -First 1) -and -not (Test-Path -LiteralPath (Join-Path $StateDir 'installation.json'))) {
+    throw 'StateDir is not empty and has no Reelarr installation record. Choose a new dedicated directory.'
+}
+
 # Resolve a real executable; the startup task never depends on a PATH or launcher.
 if ($PythonExe) {
     $resolved = & $PythonExe -c 'import sys; print(sys.executable)'
@@ -44,8 +55,8 @@ if ($LASTEXITCODE -ne 0 -or -not $resolved -or -not (Test-Path -LiteralPath ([st
     throw 'Python was not found. Install Python 3.12 for all users or pass -PythonExe with its full path.'
 }
 $PythonExe = [string]$resolved
-& $PythonExe -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)'
-if ($LASTEXITCODE -ne 0) { throw 'Python 3.12 or newer is required; Python 3.12 is recommended.' }
+& $PythonExe -c "import sys,struct; sys.exit(0 if sys.version_info >= (3, 12) and struct.calcsize('P') == 8 else 1)"
+if ($LASTEXITCODE -ne 0) { throw '64-bit Python 3.12 or newer is required; Python 3.12 is recommended.' }
 $basePrefix = & $PythonExe -c 'import sys; print(sys.base_prefix)'
 if ($basePrefix.StartsWith($env:USERPROFILE + '\', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'This is a per-user Python installation. Install Python for all users so Local Service can run it before sign-in.'
@@ -54,6 +65,10 @@ if ($basePrefix.StartsWith($env:USERPROFILE + '\', [StringComparison]::OrdinalIg
 Stop-ReelarrTask $TaskName
 Protect-Directory $InstallDir 'ReadAndExecute'
 Protect-Directory $StateDir 'Modify'
+[IO.File]::WriteAllText($marker, 'Reelarr native Windows installation')
+# Keep enough metadata to permit retrying a partially completed installation.
+$configPath = Join-Path $StateDir 'server.json'
+Write-JsonFile (Join-Path $StateDir 'installation.json') ([ordered]@{ install_dir = $InstallDir; task_name = $TaskName; config_path = $configPath })
 foreach ($folder in @('app', 'deploy')) {
     $destination = Join-Path $InstallDir $folder
     if (Test-Path -LiteralPath $destination) { Remove-Item -LiteralPath $destination -Recurse -Force }
@@ -70,7 +85,6 @@ if (-not (Test-Path -LiteralPath $serverPython)) {
 & $serverPython -m pip install --disable-pip-version-check -r (Join-Path $InstallDir 'requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check internet access and rerun the installer. Your data is preserved.' }
 
-$configPath = Join-Path $StateDir 'server.json'
 if (Test-Path -LiteralPath $configPath) {
     $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
     if ($PSBoundParameters.ContainsKey('Port')) { $config.port = $Port }
@@ -97,7 +111,6 @@ try {
         }
     }
     Move-Item -LiteralPath $candidate -Destination $configPath -Force
-    Write-JsonFile (Join-Path $StateDir 'installation.json') ([ordered]@{ install_dir = $InstallDir; task_name = $TaskName; config_path = $configPath })
     Protect-Directory $InstallDir 'ReadAndExecute'
     Protect-Directory $StateDir 'Modify'
     # Detect a conflicting listener before registering or starting this task.

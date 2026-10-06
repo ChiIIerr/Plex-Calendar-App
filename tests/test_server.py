@@ -28,7 +28,7 @@ def test_config_resolves_storage_from_file_not_working_directory(tmp_path, monke
 
 @pytest.mark.parametrize("changes", [
     {"port": True}, {"port": 0}, {"port": 65536}, {"port": "8282"},
-    {"bind_host": "public.example.com"}, {"bind_host": None},
+    {"bind_host": "public.example.com"}, {"bind_host": None}, {"bind_host": True},
     {"public_url": "https://user:secret@example.com"},
     {"public_url": "https://example.com/calendar"},
     {"public_url": "https://example.com?token=secret"},
@@ -36,6 +36,7 @@ def test_config_resolves_storage_from_file_not_working_directory(tmp_path, monke
     {"public_url": "ftp://example.com"}, {"public_url": "https://example.com:99999"},
     {"public_url": "https://example.com\n"}, {"public_url": None},
     {"trusted_proxies": "*"}, {"trusted_proxies": "127.0.0.1,"},
+    {"trusted_proxies": "0.0.0.0/0"}, {"trusted_proxies": "::/0"},
     {"trusted_proxies": ["127.0.0.1"]}, {"unknown_key": True},
     {"data_dir": ""}, {"data_dir": []}, {"data_dir": "logs"},
 ])
@@ -50,6 +51,10 @@ def test_config_handles_windows_utf8_bom_and_proxy_networks(tmp_path):
     config = load_config(path)
     assert config["public_url"] == "https://calendar.example.com"
     assert config["trusted_proxies"] == "127.0.0.1,10.0.0.0/24,::1"
+
+
+def test_default_public_origin_uses_custom_port(tmp_path):
+    assert load_config(write_config(tmp_path, port=18282))["public_url"] == "http://localhost:18282"
 
 
 def test_production_config_overrides_inherited_demo_and_storage(tmp_path, monkeypatch):
