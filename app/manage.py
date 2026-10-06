@@ -12,7 +12,14 @@ def main():
     parser = argparse.ArgumentParser(description="Recover a local Reelarr administrator account")
     parser.add_argument("command", choices=["reset-admin"])
     parser.add_argument("username")
+    parser.add_argument("--config", type=Path, help="Use the installed server's data directory")
     args = parser.parse_args()
+    if args.config:
+        from .server import apply_environment, load_config
+        try:
+            apply_environment(load_config(args.config))
+        except ValueError as error:
+            parser.error(str(error))
     store = Store(Path(os.environ.get("DATA_DIR", "data")))
     with store.connection() as db:
         row = db.execute("SELECT * FROM users WHERE username=? AND role='admin' AND provider='local'", (args.username,)).fetchone()

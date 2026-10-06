@@ -1,90 +1,128 @@
 # Reelarr · Plex Calendar
 
-A self-hosted calendar for the shows and movies making their way to your Plex library. Reelarr reads Sonarr, Radarr, Plex Media Server, and qBittorrent, then gives your users one place to see release dates, download progress, monitoring additions, and confirmed Plex availability.
+A native Windows server app for the shows and movies making their way to your Plex library. Reelarr reads Sonarr, Radarr, Plex Media Server, and qBittorrent, then gives your users one place to see release dates, download progress, monitoring additions, and confirmed Plex availability.
 
 ## What’s included
 
 - Responsive month, week, and agenda calendars with search, media filters, and status filters.
-- Download and queue views with progress, speed, ETA, paused/stalled states, and import warnings.
+- Download/queue views with progress, speed, ETA, paused/stalled states, and import warnings.
 - A monitored catalog and persistent activity history for additions, removals, monitoring changes, and arrivals in Plex.
-- A required local administrator, additional local viewer/admin accounts, password changes, and offline administrator recovery.
-- Optional Plex sign-in. Users must have access to the configured Plex server and receive viewer access. You can require approval of each new Plex account.
-- Admin-only integration settings and connection tests. Credentials are encrypted at rest and never sent back to the browser.
-- SQLite persistence, background polling, independent service error handling, and clearly marked cached status during outages.
-- Docker Compose with automatic restarts, a health check, and a non-root container. No separate database or frontend build is needed.
+- A required local administrator, additional local accounts, password changes, and offline admin recovery.
+- Optional Plex sign-in with server-access checks and optional administrator approval.
+- Admin-only integration settings and connection tests. Credentials are encrypted at rest and never returned to the browser.
+- SQLite persistence, independent background polling, and clearly marked cached status during outages.
+- A Windows installer, automatic boot startup before sign-in, failure recovery, protected storage, and rotating logs. No separate database or frontend build is needed.
 
 Reelarr reads the upstream services. Add titles, edit monitoring, manage downloads, and scan libraries in their respective applications.
 
-## Start with Docker Compose
+## Install on Windows
 
-Install Docker Engine with the Compose plugin, or Docker Desktop. Then:
+Use Windows 10/11 or Windows Server 2016 or newer, with Windows PowerShell 5.1 or PowerShell 7. Install **64-bit Python 3.12 for all users**, including the Python launcher. Choose **Customize installation → Install for all users** in the [Python Windows installer](https://www.python.org/downloads/windows/). An installation under your user profile cannot be used by the boot task. Python 3.12 is the version tested by this project.
 
-```sh
+Download and extract the repository’s ZIP, or clone it with Git:
+
+```powershell
 git clone https://github.com/ChiIIerr/Plex-Calendar-App.git
 cd Plex-Calendar-App
-cp .env.example .env
-docker compose up -d --build
 ```
 
-Open **http://localhost:8282**. Before creating the administrator, read the one-time setup token:
+Open **PowerShell as Administrator**, change into the extracted/cloned folder, then run:
 
-```sh
-docker compose exec reelarr cat /data/setup-token
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\install.ps1
 ```
 
-Enter that token on the setup page, choose a username, and set a password of at least 12 characters. The app removes the setup-token file once the administrator is created. There is no default password and no public self-registration for local accounts.
+The installer installs dependencies, creates a dedicated Python environment, registers the **Reelarr** Task Scheduler task, and starts the app. It uses these defaults:
 
-Open **Settings**, enter each service’s server URL and credentials, test its connection, enable it, and save. Use **Sync now** to fetch the first snapshot. The default polling intervals are 60 seconds for Arr/download status and five minutes for the Plex library.
+| Item | Location |
+| --- | --- |
+| App and Python environment | `C:\Program Files\Reelarr` |
+| Server configuration | `C:\ProgramData\Reelarr\server.json` |
+| Accounts, encrypted credentials, calendar cache/history | `C:\ProgramData\Reelarr\data` |
+| Log file | `C:\ProgramData\Reelarr\logs\server.log` |
+| Local address | `http://localhost:8282` |
 
-The URLs must be reachable **from the container**:
+Paths use your system’s actual Program Files/ProgramData locations. App files are readable by Local Service; data/config/logs are accessible only to Local Service, Administrators, and SYSTEM. The task runs under **Local Service**, uses one server process, starts at boot without an interactive Windows login, has no runtime cutoff, and retries a failed process up to five times at one-minute intervals. Unavailable upstream services are handled inside the app and do not kill the server.
+
+For a nondefault installation, supply `-InstallDir`, `-StateDir`, `-TaskName`, `-PythonExe`, `-Port`, or `-PublicUrl`. Use an all-users Python executable with `-PythonExe`. Keep InstallDir and StateDir separate and outside the source checkout. Use the same custom paths/task name on updates, and pass `-StateDir` to the management scripts. `-NoStart` registers startup without immediately launching the server.
+
+### Create the administrator and connect services
+
+Open **http://localhost:8282**. Read the first-run setup token from an elevated PowerShell window:
+
+```powershell
+Get-Content "$env:ProgramData\Reelarr\data\setup-token"
+```
+
+Enter that token on the setup page, choose a username, and create a password of at least 12 characters. The token file disappears when setup succeeds. There is no default password and no public local-account registration. If you used a custom data location, use the path printed by the installer.
+
+In **Settings**, enter each service’s URL and credentials, test its connection, enable it, and save. Use **Sync now** for the first snapshot. Default polling is every 60 seconds for Arr/download status and every five minutes for Plex.
+
+URLs must be reachable **from your Windows server**. If the services are on that same machine, use:
 
 | Service | Typical address | Credential |
 | --- | --- | --- |
-| Sonarr | `http://sonarr:8989` | API key from Settings → General → Security |
-| Radarr | `http://radarr:7878` | API key from Settings → General → Security |
-| Plex Media Server | `http://plex:32400` | Server owner’s `X-Plex-Token` |
-| qBittorrent | `http://qbittorrent:8080` | Web UI username/password |
+| Sonarr | `http://127.0.0.1:8989` | API key from Settings → General → Security |
+| Radarr | `http://127.0.0.1:7878` | API key from Settings → General → Security |
+| Plex Media Server | `http://127.0.0.1:32400` | Server owner’s `X-Plex-Token` |
+| qBittorrent | `http://127.0.0.1:8080` | Web UI username/password |
 
-Container names work when Reelarr shares a Docker network with those services. Join your existing external network by adding a `networks` entry to the Reelarr service and declaring that network with `external: true`. For services installed directly on the Docker host, use `host.docker.internal` with their published ports. A LAN IP is another option. Preserve any configured URL base, such as `http://host:8989/sonarr`.
+Use the other machine’s LAN address for services hosted elsewhere. Preserve configured URL bases, such as `http://host:8989/sonarr`. Enable the qBittorrent Web UI, and make sure its host/domain settings accept the URL you use. Reelarr maintains the required login cookie and Origin/Referer headers. It uses Web API v2 username/password login; optional API-key login is not implemented.
 
-Enable the qBittorrent Web UI. Its configured host/domain must accept the URL you use. Reelarr sends the Origin/Referer headers and maintains the required login cookie. It supports the common Web API v2 username/password authentication used in qBittorrent 4.1+ and 5.x; the optional newer API-key authentication is not implemented.
+### Start, stop, logs, and updates
 
-### Run on startup
+Run these scripts from the checkout or the installed `deploy` folder in **PowerShell as Administrator**. Allow scripts for the current window only, if needed:
 
-The included `restart: unless-stopped` policy starts Reelarr when the Docker daemon starts, unless you explicitly stopped the container. On Linux, enable the Docker service at boot. On Windows/macOS, enable Docker Desktop’s startup option; it normally starts when you sign in. For unattended startup before a user signs in, use a server running Docker Engine or a native service.
-
-Useful commands:
-
-```sh
-docker compose logs -f reelarr
-docker compose restart reelarr
-docker compose down
-# After pulling an update:
-git pull
-docker compose up -d --build
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\deploy\status.ps1
+.\deploy\stop.ps1
+.\deploy\start.ps1
+.\deploy\start.ps1 -Restart
+Get-Content "$env:ProgramData\Reelarr\logs\server.log" -Tail 50 -Wait
 ```
 
-The `reelarr-data` volume retains your administrator, integration configuration, cache, and activity history across container upgrades. `docker compose down` preserves it; `docker compose down -v` removes it. Failed service connections use increasing retry intervals, up to 30 minutes, to avoid repeatedly hammering an unavailable service or a rejected login. **Sync now** retries immediately, and changing its saved connection resets that delay.
+`start.ps1 -Foreground` stops the task and runs the app in the current window for troubleshooting; Ctrl+C stops it. Run `start.ps1` afterward to return to background operation. Logs rotate at 5 MB with five retained backups. HTTP access logs are disabled.
+
+To update, download the new ZIP or pull changes into your **source checkout**, then rerun the installer:
+
+```powershell
+git pull --ff-only
+powershell -NoProfile -ExecutionPolicy Bypass -File .\deploy\install.ps1
+```
+
+The installer stops the task, replaces app files, installs pinned dependencies, preserves existing configuration/data, and starts the updated app. Do not run the installer from the copy in Program Files. If an update fails, data is retained; correct the reported problem and rerun it. An update is not an automatic rollback.
+
+To stop the app and remove automatic startup while retaining everything on disk:
+
+```powershell
+.\deploy\remove-startup.ps1
+```
+
+Rerun the installer from the source checkout to register startup again. `stop.ps1` alone stops the current run; the boot trigger remains enabled.
 
 ## External access
 
-Run Reelarr behind your existing HTTPS reverse proxy. The default port binding is loopback-only, so a reverse proxy running on the Docker host can connect to `127.0.0.1:8282`.
+Use your existing **HTTPS reverse proxy** on Windows. The default listener is `127.0.0.1:8282`. Point the proxy at that address and edit `C:\ProgramData\Reelarr\server.json` as Administrator:
 
-Set these values in `.env` and recreate the container:
-
-```dotenv
-PUBLIC_URL=https://calendar.your-domain.example
-SECURE_COOKIES=true
-FORWARDED_ALLOW_IPS=127.0.0.1
+```json
+{
+  "bind_host": "127.0.0.1",
+  "port": 8282,
+  "public_url": "https://calendar.your-domain.example",
+  "trusted_proxies": "127.0.0.1,::1",
+  "data_dir": "C:\\ProgramData\\Reelarr\\data",
+  "log_dir": "C:\\ProgramData\\Reelarr\\logs"
+}
 ```
 
-```sh
-docker compose up -d
-```
+Restart with `start.ps1 -Restart`. HTTPS public URLs enable secure login cookies automatically. [deploy/Caddyfile.example](deploy/Caddyfile.example) is a configuration example for Caddy running on the same Windows server. Use your existing proxy’s Windows startup setup, or Caddy’s documented Windows service setup, to keep the HTTPS endpoint available after a reboot.
 
-Point your proxy at Reelarr’s HTTP port. [deploy/Caddyfile.example](deploy/Caddyfile.example) shows a host-installed Caddy configuration. If the proxy runs in another container, attach it to Reelarr’s network and proxy to `reelarr:8282`. Set `FORWARDED_ALLOW_IPS` to that proxy’s actual address or trusted network; do not trust arbitrary public clients. The app accepts the configured public origin for protected requests and enables secure cookies automatically for an HTTPS `PUBLIC_URL`.
+If your proxy runs on another machine, set `bind_host` to the server’s LAN IP, set `trusted_proxies` to the proxy’s actual IP/network, and allow the app port in Windows Firewall **only from that proxy**. Use specific addresses/networks; wildcard proxy trust is rejected. `public_url` must be an HTTP/HTTPS origin without a path prefix. Serve the app at the root of its hostname.
 
-To access the app directly from your LAN without a host-installed proxy, set `BIND_ADDRESS=0.0.0.0` and set `PUBLIC_URL` to the actual LAN address. Use HTTPS via a reverse proxy for internet-facing access. Publish the calendar app’s proxy endpoint; the upstream services can stay on your internal network. Serve Reelarr at the root of its hostname; hosting it under a path prefix is not currently supported.
+For direct LAN access, use the server’s LAN IP for `bind_host` and `public_url`, and scope a Windows Firewall rule to your LAN. Internet-facing access should go through HTTPS. Expose the calendar proxy endpoint; users do not need direct access to the upstream services. The installer does not create firewall rules or configure your reverse proxy.
+
+The server config is validated before startup. Relative data/log paths resolve against the config file’s directory. For installer-managed setups, keep both inside StateDir so their permissions stay protected. The supplied [example config](deploy/server.example.json) uses relative paths. Do not put integration credentials in this file; enter them in admin Settings.
 
 ### Plex sign-in
 
@@ -118,54 +156,51 @@ qBittorrent torrents are shown only through matching Sonarr/Radarr queue entries
 
 On the first sync, catalog additions use the original `added` timestamp when the source provides it. Monitoring toggles and removals are recorded when Reelarr observes them; it cannot reconstruct monitoring changes made before it was installed or changes toggled back between polls. The activity log retains the latest 5,000 entries; the Activity page shows the most recent 200. Availability activity is recorded when an observed item transitions into Plex. Existing Plex media does not create a flood of arrival events on initial setup.
 
-## Direct Python installation
+## Recover an administrator password
 
-Python 3.12 or newer is supported. On macOS/Linux:
+In elevated PowerShell, from the source checkout or installed application folder:
 
-```sh
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8282 --workers 1 --no-access-log
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\deploy\reset-admin.ps1 -Username YOUR_USERNAME
 ```
 
-The default data directory is `./data`. Read `data/setup-token`, then complete setup in your browser. Set `DATA_DIR` to an absolute persistent path for a managed service. `PUBLIC_URL`, `SECURE_COOKIES`, and `FORWARDED_ALLOW_IPS` work the same way as in Docker.
+The script uses the installed data location, stops the running task, prompts for a new password without displaying it, and restarts the task if it was running. It re-enables that local admin and revokes their existing sessions. Add `-StateDir` for a custom installation. Recovery requires local administrator access to the server.
 
-**Use one worker.** Background polling, login throttling, and pending Plex sign-in challenges run inside the application process. Multiple workers would duplicate polling and split those in-memory records.
+## Backup and restore
 
-- Linux: adapt [deploy/reelarr.service.example](deploy/reelarr.service.example), create its service user and writable data directory, install the unit, and enable it with your service manager.
-- Windows: run `powershell -ExecutionPolicy Bypass -File deploy/start.ps1` from the checkout. To start it automatically, create a Task Scheduler task triggered at startup or sign-in, using that script’s absolute path and a user that can read the checkout/write the data directory. Configure restart-on-failure in the task. Install dependencies once before registering an unattended task.
-- macOS: Docker Desktop is the default option. A direct Python installation can also be registered with `launchd`, using the absolute Python executable, checkout working directory, and persistent `DATA_DIR`.
+Stop the task and back up the **entire data directory**, including `reelarr.sqlite3`, any journal files, and **encryption.key**. Also keep `server.json` and a record of custom installation paths. The database and key must stay together; losing the key makes integration credentials unreadable. Start the app again after copying.
 
-### Recover an administrator password
-
-Recovery requires shell access to the server’s persistent data. It never sends a reset link externally.
-
-```sh
-docker compose exec -it reelarr python -m app.manage reset-admin YOUR_USERNAME
-# Or, for a native installation:
-.venv/bin/python -m app.manage reset-admin YOUR_USERNAME
-```
-
-Enter the new password at the hidden prompts. The command re-enables that local administrator and signs out existing sessions. Keep the same `DATA_DIR` as the running app.
-
-### Backup
-
-Stop the app briefly and back up the entire persistent data directory/volume, including `reelarr.sqlite3`, its journal files if present, and **encryption.key**. Keep them together: losing the encryption key makes stored service credentials unreadable. Restore the files with ownership readable/writable by the app’s user (`10001:10001` in the default container). Do not commit data, setup tokens, or keys to source control.
+To restore on another Windows server, install without starting (`-NoStart`), copy the backed-up data into the installed data directory, then rerun the installer. It reapplies Windows permissions and starts the app using the restored accounts/settings. Update paths in server.json if necessary. The application, data, and Python installation must be on local disks accessible before sign-in; mapped drives are not suitable for boot startup. Do not commit data, setup tokens, or keys to source control.
 
 ## Development and demo
 
-```sh
-.venv/bin/python -m pip install -r requirements-dev.txt
-.venv/bin/python -m pytest -q
-# Isolated read-only sample preview, no integration credentials required:
-DEMO_MODE=1 DATA_DIR=./data/demo .venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8282
+For development, make a virtual environment in the source checkout:
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe tests\smoke_native.py
+Copy-Item deploy\server.example.json server.json
+.\.venv\Scripts\python.exe -m app.server --config server.json
 ```
 
-The demo bypasses sign-in for its **sample data only**, rejects account/configuration writes, and displays a visible demo label. Keep `DEMO_MODE` unset for a real installation. Its titles, episode numbering, release dates, and download values are illustrative rather than a factual release schedule.
+The same Python entry point works on macOS/Linux with `.venv/bin/python`; the installer/startup scripts target Windows. Use exactly **one worker**, since polling, login throttling, and pending Plex challenges are in-process.
 
-Tests exercise authentication/CSRF, viewer permissions, admin preservation, credential encryption/redaction, session revocation, date ranges, download states, monitoring diffs, pagination, Plex ID matching/access checks, and partial-service outages through mock HTTP responses. GitHub Actions also builds and starts the Compose container, then verifies administrator setup, protected login, persistent storage, and login after a restart. Live connectivity still needs your own service URLs/credentials. Docker validation requires a Docker installation.
+For a separate sample preview only:
 
-Runtime dependencies are pinned in `requirements.lock`; the UI uses local system fonts and no third-party CDN assets. The container health check tests the app itself, so one unavailable upstream does not restart an otherwise healthy calendar.
+```powershell
+$env:DEMO_MODE = '1'
+$env:DATA_DIR = 'data/demo'
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8282 --workers 1 --no-access-log
+```
+
+The demo bypasses login for **sample data**, rejects account/config writes, and displays a demo label. Its titles, dates, and download values are illustrative. `app.server` always clears inherited demo flags, so the installed server uses real authentication.
+
+Tests cover authentication/CSRF, viewer permissions, admin preservation, credential encryption/redaction, session revocation, date ranges, download states, monitoring changes, pagination, Plex matching/access, service outages, native configuration, and log rotation. GitHub Actions runs on Windows and Linux, starts the real native server, and verifies setup/login/persistence. Its Windows job additionally installs the app, starts it through the Local Service boot task, verifies task settings and filesystem permissions, exercises restart and installer updates, and removes startup without deleting data. Upstream-service tests use mock HTTP responses; live connectivity needs your own URLs and credentials.
+
+Dependencies are pinned in `requirements.lock`. The UI uses local fonts and no third-party CDN assets.
 
 ## API references
 

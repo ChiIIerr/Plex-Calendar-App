@@ -1,9 +1,0 @@
-.git
-.env
-.venv
-data
-tests
-__pycache__
-*.pyc
-.pytest_cache
-*.zip

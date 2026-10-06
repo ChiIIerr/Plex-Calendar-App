@@ -8,7 +8,10 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,12 +24,9 @@ jobs:
         with:
           node-version: '22'
       - run: node --check app/static/app.js
-      - run: docker compose config --quiet
-      - run: docker compose build
-      - name: Start the packaged server
-        run: docker compose up -d --wait --wait-timeout 90
-      - name: Verify container login and persistence
-        run: python tests/smoke_container.py
-      - name: Stop the test server
-        if: always()
-        run: docker compose down -v
+      - name: Verify native server login and persistence
+        run: python tests/smoke_native.py
+      - name: Verify Windows installer and boot startup
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\tests\smoke_windows.ps1

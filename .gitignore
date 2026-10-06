@@ -1,5 +1,8 @@
 .env
 .venv/
+logs/
+server.json
+installation.json
 data/
 __pycache__/
 *.py[cod]
