@@ -1,0 +1,6 @@
+# Replace calendar.example.com with your actual hostname.
+# This example assumes Caddy runs directly on the same host as Docker.
+calendar.example.com {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:8282
+}
