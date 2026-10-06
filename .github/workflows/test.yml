@@ -11,12 +11,19 @@ jobs:
     strategy:
       matrix:
         os: [windows-latest, ubuntu-latest]
+        python-version: ['3.12', '3.13', '3.14']
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Prepare Python 3.12 for the Windows runtime upgrade check
+        if: runner.os == 'Windows' && matrix.python-version == '3.14'
+        id: baseline-python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
           cache: pip
       - run: python -m pip install -r requirements-dev.txt
       - run: python -m pytest -q
@@ -26,9 +33,15 @@ jobs:
       - run: node --check app/static/app.js
       - name: Verify native server login and persistence
         run: python tests/smoke_native.py
+      - name: Verify Windows Python discovery
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: .\tests\test_python.ps1
       - name: Verify Windows installer and boot startup
         if: runner.os == 'Windows'
         shell: powershell
+        env:
+          CALENDARR_BASELINE_PYTHON: ${{ steps.baseline-python.outputs.python-path }}
         run: .\tests\smoke_windows.ps1
       - name: Verify upgrade from the previous project name
         if: runner.os == 'Windows'

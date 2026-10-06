@@ -48,7 +48,13 @@ def main():
                 env = os.environ | {"DEMO_MODE": "1"}
                 process = subprocess.Popen([sys.executable, "-m", "app.server", "--config", str(config_path)], cwd=ROOT, env=env, stdout=output, stderr=output)
             elif process:
-                process.terminate()
+                if os.name == "nt" and process.poll() is None:
+                    # A Windows venv redirector can spawn a child interpreter.
+                    # Stop the tree so it releases log/database files before cleanup.
+                    subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                elif process.poll() is None:
+                    process.terminate()
                 try:
                     process.wait(timeout=15)
                 except subprocess.TimeoutExpired:

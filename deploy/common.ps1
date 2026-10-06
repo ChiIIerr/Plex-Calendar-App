@@ -2,6 +2,51 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Resolve-PythonExecutable([string]$PythonExe) {
+    if ($PythonExe) {
+        $resolved = & $PythonExe -c 'import sys; print(sys.executable)'
+        if ($LASTEXITCODE -eq 0 -and $resolved) { return [string]$resolved }
+    } else {
+        if (Get-Command py.exe -ErrorAction SilentlyContinue) {
+            foreach ($version in @('3.14', '3.13', '3.12')) {
+                try {
+                    $resolved = & py.exe "-$version" -c 'import sys; print(sys.executable)' 2>$null
+                    if ($LASTEXITCODE -eq 0 -and $resolved) { return [string]$resolved }
+                } catch { }
+            }
+        }
+        if (Get-Command python.exe -ErrorAction SilentlyContinue) {
+            $resolved = & python.exe -c 'import sys; print(sys.executable)'
+            if ($LASTEXITCODE -eq 0 -and $resolved) { return [string]$resolved }
+        }
+    }
+    throw 'Python was not found. Install 64-bit Python 3.14 for all users or pass -PythonExe with its full path. Python 3.12 and 3.13 are also supported.'
+}
+
+function Initialize-PythonEnvironment([string]$PythonExe, [string]$InstallDir) {
+    $installRoot = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
+    $environmentDir = [IO.Path]::GetFullPath((Join-Path $installRoot '.venv'))
+    # --clear may delete only the dedicated environment beneath this installation.
+    if ($environmentDir -ne ($installRoot + '\.venv')) { throw 'Invalid Python environment path.' }
+    $serverPython = Join-Path $environmentDir 'Scripts\python.exe'
+    $versionCode = 'import sys; print(".".join(map(str, sys.version_info[:2])))'
+    $selectedVersion = & $PythonExe -c $versionCode
+    if ($LASTEXITCODE -ne 0 -or -not $selectedVersion) { throw 'Could not determine the selected Python version.' }
+    $installedVersion = $null
+    if (Test-Path -LiteralPath $serverPython) {
+        try {
+            $installedVersion = & $serverPython -c $versionCode 2>$null
+            if ($LASTEXITCODE -ne 0) { $installedVersion = $null }
+        } catch { $installedVersion = $null }
+    }
+    if ($installedVersion -ne $selectedVersion) {
+        # Reinstall dependencies for the new ABI; retain configuration/data in StateDir.
+        & $PythonExe -m venv --clear $environmentDir | Out-Host
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create the Python environment. Your data is preserved; rerun the installer.' }
+    }
+    return $serverPython
+}
+
 function Get-PreviousProductName {
     $compatibility = Join-Path (Split-Path $PSScriptRoot -Parent) 'app\legacy.json'
     return (Get-Content -LiteralPath $compatibility -Raw -Encoding UTF8 | ConvertFrom-Json).previous_name

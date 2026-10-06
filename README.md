@@ -63,7 +63,7 @@ Users sign in with a local account. Optional Plex sign-in can be enabled in Sett
 
 ## Install on Windows
 
-Use Windows 10/11 or Windows Server 2016 or newer, with Windows PowerShell 5.1 or PowerShell 7. Install **64-bit Python 3.12 for all users**, including the Python launcher. Choose **Customize installation → Install for all users** in the [Python Windows installer](https://www.python.org/downloads/windows/). An installation under your user profile cannot be used by the boot task. Python 3.12 is the version tested by this project.
+Use Windows 10/11 or Windows Server 2016 or newer, with Windows PowerShell 5.1 or PowerShell 7. Install **64-bit Python 3.14 for all users**, including the Python launcher. Choose **Customize installation → Install for all users** in the [Python Windows installer](https://www.python.org/downloads/windows/). An installation under your user profile cannot be used by the boot task. Python 3.12, 3.13, and 3.14 are supported; the installer prefers 3.14, then 3.13, then 3.12 when using the launcher. Use the standard CPython build.
 
 Download and extract the repository’s ZIP, or clone it with Git:
 
@@ -118,6 +118,8 @@ Use the other machine’s LAN address for services hosted elsewhere. Preserve co
 ### Upgrading an earlier installation
 
 Rerun the installer from the updated source checkout. It detects an earlier native installation, retains its app/data locations, and renames the default startup task to **Calendarr**. Custom task names remain as configured. Run `status.ps1` to see the actual paths if they differ from the defaults above.
+
+To upgrade from Python 3.12 to 3.14, install the all-users Python 3.14 runtime and rerun the installer. When the selected Python major/minor version differs from the installed environment, the installer rebuilds only the app's `.venv` and reinstalls pinned dependencies. Configuration, accounts, encrypted credentials, and calendar history remain in StateDir. Use `-PythonExe 'C:\Program Files\Python314\python.exe'` if needed, replacing that example with your actual all-users Python path.
 
 On first start, Calendarr upgrades the previous database to `calendarr.sqlite3`, including committed journal records, and preserves accounts, encrypted credentials, history, and the original encryption key. The previous database remains as a backup. The previous default display name changes to Calendarr; custom display names are preserved. Existing users sign in again because the browser session cookie has a new name. The old product identifier appears only in the compatibility file used to detect previous installations.
 
@@ -230,7 +232,7 @@ To restore on another Windows server, install without starting (`-NoStart`), cop
 For development, make a virtual environment in the source checkout:
 
 ```powershell
-py -3.12 -m venv .venv
+py -3.14 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe tests\smoke_native.py
@@ -250,7 +252,7 @@ $env:DATA_DIR = 'data/demo'
 
 The demo bypasses login for **sample data**, rejects account/config writes, and displays a demo label. Its titles, dates, and download values are illustrative. `app.server` always clears inherited demo flags, so the installed server uses real authentication.
 
-Tests cover authentication/CSRF, viewer permissions, admin preservation, credential encryption/redaction, session revocation, date ranges, download states, monitoring changes, pagination, Plex matching/access, service outages, native configuration, and log rotation. GitHub Actions runs on Windows and Linux, starts the real native server, and verifies setup/login/persistence. Its Windows job additionally installs the app, starts it through the Local Service boot task, verifies task settings and filesystem permissions, exercises restart and installer updates, and removes startup without deleting data. Upstream-service tests use mock HTTP responses; live connectivity needs your own URLs and credentials.
+Tests cover authentication/CSRF, viewer permissions, admin preservation, credential encryption/redaction, session revocation, date ranges, download states, monitoring changes, pagination, Plex matching/access, service outages, native configuration, and log rotation. GitHub Actions is configured to run Python 3.12, 3.13, and 3.14 on Windows and Linux, start the real native server, and verify setup/login/persistence. Its Windows jobs additionally test Python discovery, install the app, start it through the Local Service boot task, verify task settings and filesystem permissions, exercise restart and installer updates, and remove startup without deleting data. The Python 3.14 Windows job also upgrades an existing Python 3.12 environment. Upstream-service tests use mock HTTP responses; live connectivity needs your own URLs and credentials.
 
 Dependencies are pinned in `requirements.lock`. The UI uses local fonts and no third-party CDN assets.
 

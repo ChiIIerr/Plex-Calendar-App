@@ -66,21 +66,10 @@ if ((Test-Path -LiteralPath $StateDir) -and (Get-ChildItem -LiteralPath $StateDi
 }
 
 # Resolve a real executable; the startup task never depends on a PATH or launcher.
-if ($PythonExe) {
-    $resolved = & $PythonExe -c 'import sys; print(sys.executable)'
-} elseif (Get-Command py.exe -ErrorAction SilentlyContinue) {
-    $resolved = & py.exe -3.12 -c 'import sys; print(sys.executable)'
-} elseif (Get-Command python.exe -ErrorAction SilentlyContinue) {
-    $resolved = & python.exe -c 'import sys; print(sys.executable)'
-} else {
-    throw 'Install 64-bit Python 3.12 for all users, including the Python launcher, then run this installer again.'
-}
-if ($LASTEXITCODE -ne 0 -or -not $resolved -or -not (Test-Path -LiteralPath ([string]$resolved))) {
-    throw 'Python was not found. Install Python 3.12 for all users or pass -PythonExe with its full path.'
-}
-$PythonExe = [string]$resolved
+$PythonExe = Resolve-PythonExecutable $PythonExe
+if (-not (Test-Path -LiteralPath $PythonExe)) { throw 'The resolved Python executable does not exist. Pass -PythonExe with its full path.' }
 & $PythonExe -c "import sys,struct; sys.exit(0 if sys.version_info >= (3, 12) and struct.calcsize('P') == 8 else 1)"
-if ($LASTEXITCODE -ne 0) { throw '64-bit Python 3.12 or newer is required; Python 3.12 is recommended.' }
+if ($LASTEXITCODE -ne 0) { throw '64-bit Python 3.12 or newer is required; Python 3.14 is recommended.' }
 $basePrefix = & $PythonExe -c 'import sys; print(sys.base_prefix)'
 if ($basePrefix.StartsWith($env:USERPROFILE + '\', [StringComparison]::OrdinalIgnoreCase)) {
     throw 'This is a per-user Python installation. Install Python for all users so Local Service can run it before sign-in.'
@@ -104,11 +93,7 @@ foreach ($folder in @('app', 'deploy')) {
 foreach ($file in @('requirements.txt', 'requirements.lock', 'README.md')) {
     Copy-Item -LiteralPath (Join-Path $sourceDir $file) -Destination $InstallDir -Force
 }
-$serverPython = Join-Path $InstallDir '.venv\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $serverPython)) {
-    & $PythonExe -m venv (Join-Path $InstallDir '.venv')
-    if ($LASTEXITCODE -ne 0) { throw 'Could not create the Python environment.' }
-}
+$serverPython = Initialize-PythonEnvironment $PythonExe $InstallDir
 & $serverPython -m pip install --disable-pip-version-check -r (Join-Path $InstallDir 'requirements.txt')
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check internet access and rerun the installer. Your data is preserved.' }
 

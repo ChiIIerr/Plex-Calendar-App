@@ -16,7 +16,22 @@ Get-ChildItem (Join-Path $root 'deploy') -Filter '*.ps1' | ForEach-Object {
     if ($errors.Count -gt 0) { throw ($errors | Out-String) }
 }
 try {
+    if ($env:CALENDARR_BASELINE_PYTHON) {
+        # Seed a 3.12 environment so the 3.14 job exercises an actual runtime upgrade.
+        if (Test-Path -LiteralPath $installDir) { throw 'Runtime upgrade test directory is already in use.' }
+        New-Item -ItemType Directory -Path $installDir | Out-Null
+        [IO.File]::WriteAllText((Join-Path $installDir '.calendarr-installation'), 'Calendarr native Windows installation')
+        & $env:CALENDARR_BASELINE_PYTHON -m venv (Join-Path $installDir '.venv')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create the Python 3.12 upgrade fixture.' }
+        & (Join-Path $installDir '.venv\Scripts\python.exe') -m pip install -r (Join-Path $root 'requirements.txt')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not install the Python 3.12 upgrade fixture dependencies.' }
+    }
     & (Join-Path $root 'deploy\install.ps1') -InstallDir $installDir -StateDir $stateDir -TaskName $taskName -PythonExe $pythonExe -Port 18282
+    $versionCode = 'import sys; print(".".join(map(str, sys.version_info[:2])))'
+    $expectedVersion = & $pythonExe -c $versionCode
+    if ($LASTEXITCODE -ne 0) { throw 'Could not read the selected Python version.' }
+    $installedVersion = & (Join-Path $installDir '.venv\Scripts\python.exe') -c $versionCode
+    if ($LASTEXITCODE -ne 0 -or $installedVersion -ne $expectedVersion) { throw 'Installer retained the wrong Python runtime.' }
     $task = Get-ScheduledTask -TaskName $taskName
     $account = $task.Principal.UserId
     if ($account.StartsWith('S-1-')) {
