@@ -22,4 +22,11 @@ jobs:
           node-version: '22'
       - run: node --check app/static/app.js
       - run: docker compose config --quiet
-      - run: docker build -t reelarr:test .
+      - run: docker compose build
+      - name: Start the packaged server
+        run: docker compose up -d --wait --wait-timeout 90
+      - name: Verify container login and persistence
+        run: python tests/smoke_container.py
+      - name: Stop the test server
+        if: always()
+        run: docker compose down -v

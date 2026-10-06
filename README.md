@@ -163,7 +163,7 @@ DEMO_MODE=1 DATA_DIR=./data/demo .venv/bin/python -m uvicorn app.main:app --host
 
 The demo bypasses sign-in for its **sample data only**, rejects account/configuration writes, and displays a visible demo label. Keep `DEMO_MODE` unset for a real installation. Its titles, episode numbering, release dates, and download values are illustrative rather than a factual release schedule.
 
-Tests exercise authentication/CSRF, viewer permissions, admin preservation, credential encryption/redaction, session revocation, date ranges, download states, monitoring diffs, pagination, Plex ID matching/access checks, and partial-service outages through mock HTTP responses. Live connectivity still needs your own service URLs/credentials. Docker build validation requires a Docker installation.
+Tests exercise authentication/CSRF, viewer permissions, admin preservation, credential encryption/redaction, session revocation, date ranges, download states, monitoring diffs, pagination, Plex ID matching/access checks, and partial-service outages through mock HTTP responses. GitHub Actions also builds and starts the Compose container, then verifies administrator setup, protected login, persistent storage, and login after a restart. Live connectivity still needs your own service URLs/credentials. Docker validation requires a Docker installation.
 
 Runtime dependencies are pinned in `requirements.lock`; the UI uses local system fonts and no third-party CDN assets. The container health check tests the app itself, so one unavailable upstream does not restart an otherwise healthy calendar.
 
