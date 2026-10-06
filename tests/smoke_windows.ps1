@@ -3,8 +3,8 @@
 $ErrorActionPreference = 'Stop'
 if ($env:CI -ne 'true') { throw 'This check requires disposable CI state.' }
 $root = Split-Path $PSScriptRoot -Parent
-$installDir = Join-Path $env:ProgramFiles 'Reelarr CI App'
-$stateDir = Join-Path $env:ProgramData 'Reelarr CI State'
+$installDir = Join-Path $env:ProgramFiles ('Reelarr CI App ' + [char]0xE9)
+$stateDir = Join-Path $env:ProgramData ('Reelarr CI State ' + [char]0xFC)
 $taskName = 'Reelarr-CI'
 $pythonExe = (Get-Command python.exe).Source
 
@@ -47,6 +47,6 @@ try {
         Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
     }
     if (Test-Path $stateDir) {
-        Get-ChildItem $stateDir -Filter '*.log' -Recurse | ForEach-Object { Get-Content $_.FullName -Tail 40 }
+        Get-ChildItem $stateDir -Filter '*.log' -Recurse | ForEach-Object { Get-Content $_.FullName -Encoding UTF8 -Tail 40 }
     }
 }

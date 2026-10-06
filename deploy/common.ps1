@@ -15,7 +15,7 @@ function Get-Installation([string]$StateDir) {
     if (-not (Test-Path -LiteralPath $metadata)) {
         throw "Reelarr is not installed at $StateDir. Run deploy\install.ps1 first."
     }
-    return Get-Content -LiteralPath $metadata -Raw | ConvertFrom-Json
+    return Get-Content -LiteralPath $metadata -Raw -Encoding UTF8 | ConvertFrom-Json
 }
 
 function Get-ReelarrTask([string]$TaskName) {
@@ -61,7 +61,7 @@ function Protect-Directory([string]$Path, [string]$ServiceRights) {
 }
 
 function Wait-Reelarr([string]$ConfigPath, [string]$TaskName) {
-    $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+    $config = Get-Content -LiteralPath $ConfigPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $hostAddress = $config.bind_host
     if ($hostAddress -eq '0.0.0.0') { $hostAddress = '127.0.0.1' }
     if ($hostAddress -eq '::') { $hostAddress = '::1' }

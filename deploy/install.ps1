@@ -86,7 +86,7 @@ if (-not (Test-Path -LiteralPath $serverPython)) {
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed. Check internet access and rerun the installer. Your data is preserved.' }
 
 if (Test-Path -LiteralPath $configPath) {
-    $config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
+    $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($PSBoundParameters.ContainsKey('Port')) { $config.port = $Port }
     if ($PSBoundParameters.ContainsKey('PublicUrl')) { $config.public_url = $PublicUrl }
 } else {
