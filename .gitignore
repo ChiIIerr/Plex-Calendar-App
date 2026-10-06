@@ -1,0 +1,11 @@
+.env
+.venv/
+data/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+*.sqlite3*
+encryption.key
+setup-token
+*.zip
